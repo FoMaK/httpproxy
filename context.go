@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -118,7 +119,7 @@ func (ctx *Context) doAccept(w http.ResponseWriter, r *http.Request) bool {
 	return false
 }
 
-func (ctx *Context) getConnection(host string) (conn net.Conn, err error) {
+func (ctx *Context) getConnection(host string) (conn net.Conn, customError string, err error) {
 	defer func() {
 		if err, ok := recover().(error); ok {
 			ctx.doError("getConnection", ErrPanic, err)
@@ -217,9 +218,14 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (b bool) {
 	ctx.ConnectHost = host
 	switch ctx.ConnectAction {
 	case ConnectProxy:
-		conn, err = ctx.getConnection(host)
+		conn, customErr, err := ctx.getConnection(host)
 		if err != nil {
-			hijConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			if customErr != "" {
+				hijConn.Write([]byte(fmt.Sprintf("HTTP/1.1 %s\r\n\r\n", customErr)))
+			} else {
+				hijConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			}
+
 			hijConn.Close()
 			ctx.doError("Connect", ErrRemoteConnect, err)
 			return
