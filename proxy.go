@@ -2,9 +2,9 @@ package httpproxy
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 	"sync/atomic"
-	"net"
 )
 
 // Proxy defines parameters for running an HTTP Proxy. It implements
@@ -50,7 +50,7 @@ type Proxy struct {
 	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
 
 	// Allow create custom connect
-	GetConnection func(ctx *Context, host string) (connect net.Conn, err error)
+	GetConnection func(ctx *Context, host string) (connect net.Conn, customError string, err error)
 
 	// If ConnectAction is ConnectMitm, it sets chunked to Transfer-Encoding.
 	// By default, true.
@@ -75,9 +75,10 @@ func NewProxyCert(caCert, caKey []byte) (*Proxy, error) {
 			Proxy: http.ProxyFromEnvironment},
 		MitmChunked: true,
 		signer:      NewCaSignerCache(1024),
-		GetConnection: func (ctx *Context, host string) (connect net.Conn, err error) {
-			return net.Dial("tcp", host)
-        },
+		GetConnection: func(ctx *Context, host string) (connect net.Conn, customErr string, err error) {
+			connect, err = net.Dial("tcp", host)
+			return connect, "", err
+		},
 	}
 	prx.signer.Ca = &prx.Ca
 	if caCert == nil {
